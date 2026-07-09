@@ -1,0 +1,6 @@
+[
+  {"time":"08:01:05","agent":"Production Planning Twin","event":"Demand spike detected for export order","status":"recommendation queued"},
+  {"time":"08:03:18","agent":"Quality Vision Agent","event":"Surface anomaly cluster isolated","status":"supervisor approval required"},
+  {"time":"08:07:42","agent":"Machine Health Agent","event":"Bearing temperature drift predicted","status":"maintenance window recommended"},
+  {"time":"08:09:26","agent":"Fleet Routing Agent","event":"ETA drift detected on north lane","status":"customer alert drafted"}
+]
