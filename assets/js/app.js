@@ -4,7 +4,7 @@
   const pageId = document.body.dataset.page || 'command';
   const $ = (sel, root=document) => root.querySelector(sel);
   const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
-  const state = { charts: [], timers: [], scenario: 'simulate', tick: 0 };
+  const state = { charts: [], timers: [], scenario: 'simulate', tick: 0, logCursor: 0 };
 
   function hashSeed(str){
     let h=2166136261;
@@ -97,8 +97,30 @@
     const line = document.createElement('div');
     line.className='event-line';
     line.innerHTML = `<span class="time">${now()}</span> <span class="sev">${type.toUpperCase()}</span> ${msg}`;
-    log.prepend(line);
-    while(log.children.length>60) log.removeChild(log.lastChild);
+    log.appendChild(line);
+    while(log.children.length>60) log.removeChild(log.firstChild);
+    requestAnimationFrame(()=>{ log.scrollTop = log.scrollHeight; });
+  }
+
+  function startEventLogStream(agent){
+    const log = $('#eventLog');
+    if(!log) return;
+    const source = agent || {short:'Governance', signal:'Cross-agent telemetry heartbeat'};
+    const eventTypes = ['telemetry','agent','policy','lineage','approval','risk','system'];
+    const messages = [
+      () => `${source.short} sampled ${source.signal || 'live operating signal'} and refreshed confidence score.`,
+      () => `Policy gate evaluated live recommendation; human-in-the-loop threshold remains enforced.`,
+      () => `Decision trace updated with source signals, model confidence and expected operational impact.`,
+      () => `Synthetic plant event normalized and routed into governed action queue.`,
+      () => `Supervisor approval lane checked; no critical breach detected.`,
+      () => `Lineage packet captured for audit, explainability and managed-service review.`,
+      () => `Live telemetry window advanced; event stream continues scrolling upward.`
+    ];
+    state.timers.push(setInterval(()=>{
+      const i = state.logCursor++;
+      const type = eventTypes[i % eventTypes.length];
+      addLog(type, messages[i % messages.length]());
+    }, 1400));
   }
 
   function createSeries(seed, count=44, base=55, volatility=10){
@@ -258,6 +280,7 @@
       $('#hudAlerts').textContent = '7'; $('#hudActions').textContent = '92'; addLog('resolve','Resolved risks cleared after supervisor approvals.'); toast('Resolved risks cleared.');
     });
     for(let i=0;i<6;i++) addLog(['governance','agent','policy'][i%3], ['Policy threshold checked for all agent actions.','Production Twin recommended line-loading action.','Quality Vision routed defect cluster to supervisor.','Fleet Routing predicted ETA drift in north lane.','P2P Document AI created evidence pack for PO mismatch.','Energy + ESG detected peak tariff risk.'][i]);
+    startEventLogStream();
     let seed=991; const chart=$('#fleetChart'); let series=createSeries(seed,54,70,11);
     state.timers.push(setInterval(()=>{series.push(clamp(series[series.length-1]+(Math.random()*8-3),30,98)); if(series.length>54)series.shift(); drawLineChart(chart,series,{label:'Agent work rate', color:'#ff462e'});},900));
   }
@@ -325,6 +348,7 @@
     }
     state.timers.push(setInterval(()=>updateCharts(0), 1000));
     agent.buttons.forEach(b=>addLog('agent', `${b.label} ready.`));
+    startEventLogStream(agent);
     $$('.scenario-buttons button').forEach(btn=>btn.addEventListener('click',()=>{
       $$('.scenario-buttons button').forEach(x=>x.classList.remove('active'));
       btn.classList.add('active');
