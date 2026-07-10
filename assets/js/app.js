@@ -186,6 +186,31 @@
     ctx.fillStyle='#111'; ctx.font='1000 32px Inter, Arial'; ctx.textAlign='center'; ctx.fillText(`${Math.round(value)}%`,cx,cy+8); ctx.font='800 11px Inter, Arial'; ctx.fillStyle='#777'; ctx.fillText(label.toUpperCase(),cx,cy+28); ctx.textAlign='left';
   }
 
+  function impactDirection(target=''){
+    return target.includes('↓') ? 'reduce' : target.includes('↑') ? 'improve' : 'create';
+  }
+
+  function impactVerb(target=''){
+    return target.includes('↓') ? 'reduced' : target.includes('↑') ? 'improved' : 'controlled';
+  }
+
+  function drawImpactGraphic(canvas, agent, values){
+    if(!canvas) return;
+    const ctx=canvas.getContext('2d'); const dpr=window.devicePixelRatio||1; const rect=canvas.getBoundingClientRect(); canvas.width=rect.width*dpr; canvas.height=rect.height*dpr; ctx.scale(dpr,dpr);
+    const w=rect.width,h=rect.height,p=20;
+    ctx.clearRect(0,0,w,h); ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+    const grad=ctx.createLinearGradient(0,0,w,h); grad.addColorStop(0,'rgba(255,70,46,.14)'); grad.addColorStop(1,'rgba(0,166,166,.12)'); ctx.fillStyle=grad; roundRect(ctx,p,p,w-2*p,h-2*p,18); ctx.fill();
+    const primary=agent.kpis[0]; const secondary=agent.kpis[1] || primary;
+    const primaryVal=clamp(values?.[0] ?? Number(primary.value) ?? 50, 5, 96); const secondaryVal=clamp(values?.[1] ?? Number(secondary.value) ?? 50, 5, 96);
+    const r=Math.min(w,h)*.23, cx=p+r+12, cy=h*.50;
+    ctx.lineWidth=13; ctx.strokeStyle='rgba(0,0,0,.08)'; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+    const ring=ctx.createLinearGradient(cx-r,cy-r,cx+r,cy+r); ring.addColorStop(0,'#ff462e'); ring.addColorStop(1,'#00a6a6'); ctx.strokeStyle=ring; ctx.lineCap='round'; ctx.beginPath(); ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+Math.PI*2*primaryVal/100); ctx.stroke();
+    ctx.fillStyle='#111'; ctx.textAlign='center'; ctx.font='1000 24px Inter, Arial'; ctx.fillText(primary.target.replace(/\s/g,''),cx,cy+4); ctx.font='800 10px Inter, Arial'; ctx.fillStyle='#666'; ctx.fillText(primary.label.toUpperCase().slice(0,18),cx,cy+24);
+    const x=w*.52, barW=w-x-p, top=h*.33;
+    [primary,secondary].forEach((k,i)=>{ const y=top+i*42; const val=i?secondaryVal:primaryVal; ctx.fillStyle='rgba(0,0,0,.08)'; roundRect(ctx,x,y,barW,12,6); ctx.fill(); const bg=ctx.createLinearGradient(x,y,x+barW,y); bg.addColorStop(0,i?'#00a6a6':'#ff462e'); bg.addColorStop(1,i?'rgba(0,166,166,.32)':'rgba(255,70,46,.32)'); ctx.fillStyle=bg; roundRect(ctx,x,y,barW*val/100,12,6); ctx.fill(); ctx.fillStyle='#111'; ctx.font='900 11px Inter, Arial'; ctx.textAlign='left'; ctx.fillText(k.label,x,y-7); ctx.fillStyle='#666'; ctx.font='800 10px Inter, Arial'; ctx.fillText(`${impactVerb(k.target)} ${k.target.replace(/[↑↓]/,'').trim()}`,x,y+28); });
+    ctx.textAlign='left';
+  }
+
   function drawNetwork(canvas){
     if(!canvas) return;
     const ctx=canvas.getContext('2d'); const dpr=window.devicePixelRatio||1; const rect=canvas.getBoundingClientRect(); canvas.width=rect.width*dpr; canvas.height=rect.height*dpr; ctx.scale(dpr,dpr);
@@ -318,7 +343,7 @@
       </section>
       <section class="two-col">
         <div class="chart-card"><div class="chart-head"><div><h3>Projected business impact</h3><span>changes when scenarios are pressed</span></div></div><canvas class="chart small-chart" id="barChart"></canvas></div>
-        <div class="chart-card"><div class="chart-head"><div><h3>Agent trust score</h3><span>policy · data · explainability</span></div></div><canvas class="chart small-chart" id="donutChart"></canvas></div>
+        <div class="chart-card impact-card"><div class="chart-head"><div><h3>Business impact created</h3><span>${agent.short} outcome story</span></div></div><canvas class="chart small-chart" id="impactChart"></canvas><div class="impact-narrative" id="impactNarrative"><b>${agent.impact}</b><span>${agent.short} helps ${impactDirection(agent.kpis[0].target)} ${agent.kpis[0].label.toLowerCase()} by turning ${agent.signal.toLowerCase()} into a governed action.</span></div></div>
       </section>
       <section class="grid-3" style="margin-top:16px">
         <div class="panel"><h3>Acts on</h3><div class="list">${agent.actsOn.slice(0,6).map(x=>`<div class="list-item"><span class="list-dot"></span><span><b>${x}</b><span>monitored as an operational risk signal</span></span></div>`).join('')}</div></div>
@@ -333,17 +358,18 @@
   }
 
   function initAgentInteractions(agent){
-    const live=$('#liveChart'), bar=$('#barChart'), donut=$('#donutChart');
+    const live=$('#liveChart'), bar=$('#barChart'), impact=$('#impactChart');
     const seed=hashSeed(agent.id);
     let series=createSeries(seed, 54, 62+(seed%24), 9);
     let barVals=agent.kpis.map(k=>clamp(Number(k.value) || 50, 12, 95));
-    drawBars(bar, barVals, agent.kpis.map(k=>k.label)); drawDonut(donut, agent.confidence, 'Trust');
+    drawBars(bar, barVals, agent.kpis.map(k=>k.label)); drawImpactGraphic(impact, agent, barVals);
     function updateCharts(boost=0){
       series.push(clamp(series[series.length-1]+(Math.random()*8-3)+boost,18,99)); if(series.length>54) series.shift();
       drawLineChart(live, series, {label:agent.short+' telemetry', color:'#ff462e'});
       barVals = barVals.map((v,i)=>clamp(v + (Math.random()*6-2) + boost*(i%2?-.2:.2), 8, 99));
       drawBars(bar, barVals, agent.kpis.map(k=>k.label));
-      const trust = clamp(agent.confidence + Math.sin(Date.now()/1600)*4 + boost, 55, 99); drawDonut(donut, trust, 'Trust'); $('#trustValue').textContent = Math.round(trust);
+      drawImpactGraphic(impact, agent, barVals);
+      const trust = clamp(agent.confidence + Math.sin(Date.now()/1600)*4 + boost, 55, 99); $('#trustValue').textContent = Math.round(trust);
       $('#cssGauge').style.background = `conic-gradient(var(--red) 0deg, var(--teal) ${trust*3.6}deg, rgba(255,255,255,.09) ${trust*3.6}deg 360deg)`;
     }
     state.timers.push(setInterval(()=>updateCharts(0), 1000));
